@@ -1,6 +1,6 @@
 <?php
 require dirname(__DIR__) . '/src/bootstrap.php';
-$pages = ['home' => 'Overview', 'log' => 'Symptom diary', 'symptoms' => 'My symptoms', 'stats' => 'Statistics'];
+$pages = ['home' => 'Overview', 'log' => 'Symptom diary', 'symptoms' => 'My symptoms', 'stats' => 'Statistics', 'reminders' => 'Reminders'];
 $page = (string)($_GET['page'] ?? 'home');
 if (!isset($pages[$page])) { http_response_code(404); $page = 'home'; }
 $error = '';
@@ -69,15 +69,16 @@ function entryRows(array $entries): void {
 <?php } }
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#183e36"><title><?= e($pages[$page]) ?> · Daywell</title><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" type="image/svg+xml" href="assets/favicon.svg"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#183e36"><link rel="manifest" href="manifest.webmanifest"><title><?= e($pages[$page]) ?> · Daywell</title><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" type="image/svg+xml" href="assets/favicon.svg"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head>
 <body><div class="app-shell">
 <aside class="sidebar"><a class="brand" href="?page=home"><span class="brand-mark">✳</span> daywell<span class="brand-dot">.</span></a><p class="brand-caption">YOUR SYMPTOM JOURNAL</p>
-<nav aria-label="Main navigation"><?php foreach ($pages as $key => $label): ?><a <?= $page === $key ? 'aria-current="page"' : '' ?> href="?page=<?= e($key) ?>"><span aria-hidden="true"><?= ['home'=>'◫', 'log'=>'☷', 'symptoms'=>'✧', 'stats'=>'▥'][$key] ?></span><?= e($label) ?></a><?php endforeach ?></nav>
+<nav aria-label="Main navigation"><?php foreach ($pages as $key => $label): ?><a <?= $page === $key ? 'aria-current="page"' : '' ?> href="?page=<?= e($key) ?>"><span aria-hidden="true"><?= ['home'=>'◫', 'log'=>'☷', 'symptoms'=>'✧', 'stats'=>'▥', 'reminders'=>'◷'][$key] ?></span><?= e($label) ?></a><?php endforeach ?></nav>
 <div class="sidebar-note"><span aria-hidden="true">◉</span><strong>A little clarity, every day.</strong><p>A space to notice patterns and keep track of how you feel.</p><small>Stored locally in SQLite</small></div></aside>
 <main><header class="topbar"><span>Your health, at a glance</span><time datetime="<?= date('Y-m-d') ?>"><?= date('l, j F Y') ?></time></header>
 <?php if ($flash): ?><div class="notice success" role="status"><?= e($flash) ?></div><?php endif ?>
 <?php if ($error): ?><div class="notice error" role="alert"><?= e($error) ?></div><?php endif ?>
-<?php if ($page === 'home'):
+<?php if ($page === 'reminders'): require dirname(__DIR__) . '/src/reminders-view.php'; ?>
+<?php elseif ($page === 'home'):
 $total = (int)scalar('SELECT COUNT(*) FROM entries');
 $days = (int)scalar('SELECT COUNT(DISTINCT experienced_on) FROM entries');
 $average = scalar('SELECT ROUND(AVG(strength), 1) FROM entries');

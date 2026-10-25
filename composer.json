@@ -1,0 +1,14 @@
+{
+  "name": "daywell/symptom-tracker",
+  "description": "A local SQLite symptom journal with optional Web Push reminders",
+  "type": "project",
+  "require": {
+    "php": ">=8.2",
+    "ext-pdo_sqlite": "*",
+    "ext-mbstring": "*",
+    "ext-curl": "*",
+    "ext-openssl": "*",
+    "minishlink/web-push": "^10.0"
+  },
+  "config": { "allow-plugins": false, "sort-packages": true }
+}
