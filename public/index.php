@@ -46,7 +46,7 @@ try {
     if ($ex instanceof PDOException) {
         error_log((string)$ex);
         http_response_code(503);
-        exit('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Database unavailable · Daywell</title><link rel="stylesheet" href="assets/style.css"><body><section class="card"><h1>Database unavailable</h1><p>Check that SQLite is enabled and the data folder is writable, then reload this page.</p></section></body></html>');
+        exit('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Database unavailable · Daywell</title><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" type="image/svg+xml" href="assets/favicon.svg"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="stylesheet" href="assets/style.css"><body><section class="card"><h1>Database unavailable</h1><p>Check that SQLite is enabled and the data folder is writable, then reload this page.</p></section></body></html>');
     }
     else $error = $ex->getMessage();
 }
@@ -69,7 +69,7 @@ function entryRows(array $entries): void {
 <?php } }
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#183e36"><title><?= e($pages[$page]) ?> · Daywell</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#183e36"><title><?= e($pages[$page]) ?> · Daywell</title><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" type="image/svg+xml" href="assets/favicon.svg"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head>
 <body><div class="app-shell">
 <aside class="sidebar"><a class="brand" href="?page=home"><span class="brand-mark">✳</span> daywell<span class="brand-dot">.</span></a><p class="brand-caption">YOUR SYMPTOM JOURNAL</p>
 <nav aria-label="Main navigation"><?php foreach ($pages as $key => $label): ?><a <?= $page === $key ? 'aria-current="page"' : '' ?> href="?page=<?= e($key) ?>"><span aria-hidden="true"><?= ['home'=>'◫', 'log'=>'☷', 'symptoms'=>'✧', 'stats'=>'▥'][$key] ?></span><?= e($label) ?></a><?php endforeach ?></nav>
