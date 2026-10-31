@@ -34,6 +34,10 @@ function check(bool $ok, string $message): void { global $checks; if (!$ok) thro
 try {
     for ($i=0;$i<50;$i++) { usleep(50000); [$code,$html] = request('?page=symptoms'); if ($code === 200) break; }
     check($code === 200, 'Server starts');
+    $jsVersion=substr(hash_file('sha256',$root.'/public/assets/app.js'),0,12);
+    $cssVersion=substr(hash_file('sha256',$root.'/public/assets/style.css'),0,12);
+    check(str_contains($html,'src="assets/app.js?v='.$jsVersion.'"'),'JavaScript URL matches deployed contents');
+    check(str_contains($html,'href="assets/style.css?v='.$cssVersion.'"'),'Stylesheet URL matches deployed contents');
     preg_match('/name="csrf" value="([a-f0-9]+)"/', $html, $m); $csrf = $m[1];
     $post = fn(array $data, string $page = 'log') => request('?page='.$page, array_merge(['csrf'=>$csrf],$data));
     [$code] = $post(['action'=>'save_symptom','name'=>'Headache','notes'=>'<script>alert(1)</script>'], 'symptoms'); check($code===303,'Create symptom');
