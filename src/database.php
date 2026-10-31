@@ -26,6 +26,10 @@ function db(): PDO {
         last_test_at INTEGER NOT NULL DEFAULT 0, last_error TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )");
+    $db->exec('CREATE TABLE IF NOT EXISTS weather_preferences (
+        id INTEGER PRIMARY KEY CHECK(id = 1), town_id TEXT NOT NULL,
+        label TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL
+    )');
     // Add optional context to existing databases without replacing diary records.
     $columns = array_column($db->query('PRAGMA table_info(entries)')->fetchAll(), 'name');
     foreach (['town' => 'TEXT', 'weather' => 'TEXT', 'temperature_c' => 'REAL', 'pressure_hpa' => 'REAL', 'weather_source' => 'TEXT', 'weather_date' => 'TEXT', 'weather_timezone' => 'TEXT'] as $column => $type) {

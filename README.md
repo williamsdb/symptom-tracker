@@ -125,3 +125,5 @@ Additional calculation tests:
 ```sh
 php tests/statistics.php
 ```
+
+The last town selected from matching results is remembered in SQLite for this single-user installation, including across browser sessions/devices. New diary entries preselect it so you can immediately fill weather for the chosen date. Selecting another town replaces the preference; editing an existing entry preserves its own town. Weather itself is never reused from a previous date.

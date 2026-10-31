@@ -10,6 +10,18 @@ if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0)>2000) weatherRespond(['error'=>'Reque
 try {
     $input = json_decode(file_get_contents('php://input',false,null,0,2001),true,8,JSON_THROW_ON_ERROR);
     if (!is_array($input)) throw new RuntimeException('Invalid request.');
+    $savedTown = one('SELECT * FROM weather_preferences WHERE id = 1');
+    $townId = (string)($input['town_id'] ?? '');
+    $town = $_SESSION['weather_towns'][$townId] ?? null;
+    if ($town && $town['expires'] < time()) $town = null;
+    if (!$town && $savedTown && $savedTown['town_id'] === $townId) $town = $savedTown;
+    if (($input['action'] ?? '') === 'choose') {
+        if (!$town) throw new RuntimeException('Search for and select a town again.');
+        query('INSERT INTO weather_preferences (id, town_id, label, latitude, longitude) VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET town_id=excluded.town_id, label=excluded.label, latitude=excluded.latitude, longitude=excluded.longitude',
+            [$townId, $town['label'], $town['latitude'], $town['longitude']]);
+        weatherRespond(['town'=>$town['label']]);
+    }
     if (time() - ($_SESSION['weather_request_at'] ?? 0) < 2) weatherRespond(['error'=>'Please wait a moment before another lookup.'],429);
     $_SESSION['weather_request_at'] = time();
     if (($input['action'] ?? '') === 'search') {
@@ -28,8 +40,7 @@ try {
         weatherRespond(['towns'=>$results]);
     }
     if (($input['action'] ?? '') !== 'weather') throw new RuntimeException('Unknown action.');
-    $town = $_SESSION['weather_towns'][(string)($input['town_id'] ?? '')] ?? null;
-    if (!$town || $town['expires']<time()) throw new RuntimeException('Search for and select a town again.');
+    if (!$town) throw new RuntimeException('Search for and select a town again.');
     $date = (string)($input['date'] ?? '');
     if (!validDate($date) || $date < '1940-01-01' || $date > date('Y-m-d')) throw new RuntimeException('Weather lookup needs a date from 1940 through today.');
     session_write_close();

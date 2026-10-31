@@ -21,9 +21,9 @@ function request(string $path, ?array $post = null): array {
     $body = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     unset($ch); return [$code, $body];
 }
-function pushRequest(array $data, string $csrf): array {
+function pushRequest(array $data, string $csrf, string $path = 'push-api.php'): array {
     global $base, $cookie;
-    $ch = curl_init($base . 'push-api.php');
+    $ch = curl_init($base . $path);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_COOKIEJAR=>$cookie, CURLOPT_COOKIEFILE=>$cookie, CURLOPT_TIMEOUT=>5,
         CURLOPT_POST=>true, CURLOPT_POSTFIELDS=>json_encode($data), CURLOPT_HTTPHEADER=>['Content-Type: application/json','X-CSRF-Token: '.$csrf]]);
     $body = curl_exec($ch); $code = curl_getinfo($ch,CURLINFO_HTTP_CODE); unset($ch);
@@ -90,6 +90,19 @@ try {
     $ch = curl_init($base . 'weather-api.php');
     curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>'{}']);
     curl_exec($ch); check(curl_getinfo($ch,CURLINFO_HTTP_CODE)===403,'Weather endpoint requires CSRF'); unset($ch);
+    $db->exec("INSERT INTO symptoms(name) VALUES ('Test symptom')");
+    $symptomId=$db->lastInsertId();
+    $db->exec("INSERT INTO weather_preferences (id,town_id,label,latitude,longitude) VALUES (1,'2639577','Reading, England, United Kingdom',51.45,-0.97)");
+    [$code,$html] = request('?page=log');
+    check($code===200 && str_contains($html,'value="Reading, England, United Kingdom"') && str_contains($html,'value="2639577" selected'),'Last town prefills name and selected match');
+    [$code,$data] = pushRequest(['action'=>'choose','town_id'=>'2639577'],$csrf,'weather-api.php');
+    check($code===200 && $data['town']==='Reading, England, United Kingdom','Remembered town reusable without session search');
+    [$code,$data] = pushRequest(['action'=>'choose','town_id'=>'unknown'],$csrf,'weather-api.php');
+    check($code===400 && $db->query('SELECT town_id FROM weather_preferences')->fetchColumn()==='2639577','Unverified town cannot replace preference');
+    $stmt=$db->prepare('INSERT INTO entries(symptom_id,experienced_on,strength,town) VALUES (?,?,?,?)');
+    $stmt->execute([$symptomId,date('Y-m-d'),5,'Oxford']); $editId=$db->lastInsertId();
+    [$code,$html] = request('?page=log&edit='.$editId);
+    check($code===200 && str_contains($html,'name="town" maxlength="100" placeholder="e.g. Reading" value="Oxford"') && !str_contains($html,'value="2639577" selected'),'Editing preserves original town');
     $configPath = $tmp . '/push-config.php';
     $savedConfig = file_get_contents($configPath);
     chmod($configPath, 0000);

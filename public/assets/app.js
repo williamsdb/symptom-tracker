@@ -135,7 +135,7 @@ if (townSearch) {
       status.textContent = 'Date changed. Look up weather again for the new date.';
     }
   });
-  matches.addEventListener('change', () => { lookup.disabled = !matches.value || busy; });
+
   const requestWeather = async data => {
     const response = await fetch('weather-api.php', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRF-Token':town.form.querySelector('[name="csrf"]').value}, body:JSON.stringify(data) });
     let body;
@@ -149,10 +149,25 @@ if (townSearch) {
   };
   const run = async callback => {
     if (busy) return;
-    busy = true; townSearch.disabled = lookup.disabled = true;
+    busy = true; townSearch.disabled = lookup.disabled = matches.disabled = true;
     try { await callback(); } catch (error) { status.textContent = error.message; }
-    finally { busy = false; townSearch.disabled = false; lookup.disabled = !matches.value; }
+    finally { busy = false; townSearch.disabled = matches.disabled = false; lookup.disabled = !matches.value; }
   };
+  matches.addEventListener('change', () => {
+    lookup.disabled = !matches.value || busy;
+    if (!matches.value) return;
+    run(async () => {
+      const selectedId = matches.value;
+      const data = await requestWeather({action:'choose', town_id:selectedId});
+      if (matches.value !== selectedId) return;
+      if (town.value !== data.town) {
+        fields.forEach(id => { document.getElementById(id).value = ''; });
+        provenance.forEach(id => { document.getElementById(id).value = ''; });
+      }
+      town.value = data.town;
+      status.textContent = 'Town remembered for future entries. Fill weather for the selected date when ready.';
+    });
+  });
   townSearch.addEventListener('click', () => run(async () => {
     status.textContent = 'Finding matching towns…';
     const data = await requestWeather({action:'search',town:town.value});
