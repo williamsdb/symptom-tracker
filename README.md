@@ -114,7 +114,7 @@ The Statistics page now shows distinct symptom days, share of recorded days, sam
 - A pair percentage appears after at least 3 shared days and 5 days with either symptom. It is shared days divided by days with either symptom, not evidence of causation or simultaneous onset.
 - Streaks count consecutive calendar dates with entries. First-to-last span describes recording history, not continuous illness. History and time-since-last use all saved entries through today, independent of the date filter.
 
-In the diary, expand **Location & environment**, enter a town, choose **Find town**, select the correct match, then **Fill weather for this date**. This retrieves a daily weather description, mean temperature (°C), and mean sea-level pressure (hPa). Save the entry to retain them. The town label, weather source/date/timezone and values are stored in SQLite; no precise device coordinates or GPS permission are used.
+In the diary, expand **Location & environment**, enter a town, choose **Find town**, select the correct match, then **Fill weather for this date**. This retrieves a daily weather description, mean temperature (°C), and mean sea-level pressure (hPa). Save the entry to retain them. The town label, weather source/date/timezone and values are stored in SQLite; manual town search does not request device location. The optional browser-location button is described below.
 
 Lookup sends the searched town to Open-Meteo's geocoding service, then the selected town's coordinates and diary date to its weather service. Symptoms and notes are never sent. Town-local daily summaries are used; today's values include forecast hours, and older dates use historical model data. They describe the area, not a personal weather sensor. Attribution is shown in the form. See [geocoding](https://open-meteo.com/en/docs/geocoding-api), [weather](https://open-meteo.com/en/docs), and [historical weather](https://open-meteo.com/en/docs/historical-weather-api) documentation. The public service is intended for non-commercial use; check the provider's terms before commercial deployment.
 
@@ -127,3 +127,12 @@ php tests/statistics.php
 ```
 
 The last town selected from matching results is remembered in SQLite for this single-user installation, including across browser sessions/devices. New diary entries preselect it so you can immediately fill weather for the chosen date. Selecting another town replaces the preference; editing an existing entry preserves its own town. Weather itself is never reused from a previous date.
+
+
+### Find a town from browser location
+
+Choose **Use my location** in the diary's Location & environment section. Location is requested only on that click, with low-accuracy mode and a 15-second timeout. The browser requires HTTPS or localhost and your permission. Denying permission leaves manual town search available.
+
+Device coordinates are rounded to two decimal places (roughly kilometre scale) in the browser and again on the server. Daywell sends only those rounded coordinates to OpenStreetMap Nominatim to find a nearby town; symptoms, notes and precise GPS coordinates are never sent. This still discloses an approximate location to that provider. The town is shown for confirmation and remembered for future entries. Weather uses the returned town coordinates, not the precise device position. Your location now may differ from where an older diary entry occurred.
+
+Nominatim results use town-level reverse lookup, so a nearby settlement or municipality may be returned rather than the mathematically nearest town. You can correct the result using town search. The last rounded lookup is cached for 30 days using a hashed coordinate key and town result; requests are limited across sessions to one every two seconds. Attribution is displayed in the form. The server needs outbound HTTPS to `nominatim.openstreetmap.org`; no API key or Composer update is required. The public endpoint is intended for light interactive use under its [usage policy](https://operations.osmfoundation.org/policies/nominatim/). There is no background location tracking.

@@ -1,5 +1,29 @@
 <?php
 declare(strict_types=1);
+function locationCoordinates(array $input): array {
+    $coordinates = [];
+    foreach (['latitude'=>90, 'longitude'=>180] as $key=>$limit) {
+        $value = $input[$key] ?? null;
+        if ((!is_int($value) && !is_float($value)) || !is_finite((float)$value) || abs($value)>$limit) throw new RuntimeException('The browser returned an invalid location. Search for your town instead.');
+        $coordinates[$key] = round((float)$value, 2);
+    }
+    return $coordinates;
+}
+function locationTown(array $data): array {
+    $address = $data['address'] ?? [];
+    $name = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['municipality'] ?? null;
+    if (!is_string($name) || !isset($data['osm_id'],$data['osm_type'],$data['lat'],$data['lon']) || !is_numeric($data['lat']) || !is_numeric($data['lon'])) throw new RuntimeException('No nearby town was found. Please search for a town instead.');
+    $latitude = (float)$data['lat']; $longitude = (float)$data['lon'];
+    if (!is_finite($latitude) || !is_finite($longitude) || abs($latitude)>90 || abs($longitude)>180) throw new RuntimeException('The location service returned an invalid town. Search for a town instead.');
+    return ['town_id'=>'osm:' . $data['osm_type'] . ':' . $data['osm_id'],
+        'label'=>mb_substr(implode(', ',array_unique(array_filter([$name,$address['state'] ?? '',$address['country'] ?? '']))),0,100),
+        'latitude'=>$latitude, 'longitude'=>$longitude];
+}
+function rememberWeatherTown(string $id, array $town): void {
+    query('INSERT INTO weather_preferences (id, town_id, label, latitude, longitude) VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET town_id=excluded.town_id, label=excluded.label, latitude=excluded.latitude, longitude=excluded.longitude',
+        [$id,$town['label'],$town['latitude'],$town['longitude']]);
+}
 function weatherRequest(string $url): array {
     if (PHP_OS_FAMILY === 'Darwin') {
         // Some macOS/MAMP libcurl builds crash forked PHP workers while accessing

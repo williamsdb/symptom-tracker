@@ -117,6 +117,7 @@ if (reminderForm) {
 const townSearch = document.getElementById('search-town');
 if (townSearch) {
   const town = document.getElementById('town');
+  const locate = document.getElementById('use-location');
   const matches = document.getElementById('weather-town');
   const lookup = document.getElementById('lookup-weather');
   const status = document.getElementById('weather-status');
@@ -149,10 +150,36 @@ if (townSearch) {
   };
   const run = async callback => {
     if (busy) return;
-    busy = true; townSearch.disabled = lookup.disabled = matches.disabled = true;
+    busy = true; townSearch.disabled = lookup.disabled = matches.disabled = locate.disabled = true;
     try { await callback(); } catch (error) { status.textContent = error.message; }
-    finally { busy = false; townSearch.disabled = matches.disabled = false; lookup.disabled = !matches.value; }
+    finally { busy = false; townSearch.disabled = matches.disabled = locate.disabled = false; lookup.disabled = !matches.value; }
   };
+  locate.addEventListener('click', () => {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      status.textContent = 'Browser location requires HTTPS (or localhost) and a supported browser. You can still search for a town.';
+      return;
+    }
+    run(async () => {
+      status.textContent = 'Waiting for browser location permission…';
+      let position;
+      try {
+        position = await new Promise((resolve,reject) => navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:false,timeout:15000,maximumAge:60000}));
+      } catch (error) {
+        const messages = {1:'Location permission was denied. Allow it in your browser settings or search for a town.',2:'Your location is unavailable. Search for a town instead.',3:'Finding your location timed out. Try again or search for a town.'};
+        throw new Error(messages[error.code] || 'Could not get your location. Search for a town instead.');
+      }
+      status.textContent = 'Finding a nearby town…';
+      // Discard precise device coordinates before contacting our server.
+      const data = await requestWeather({action:'locate',latitude:Math.round(position.coords.latitude*100)/100,longitude:Math.round(position.coords.longitude*100)/100});
+      if (town.value !== data.town) {
+        fields.forEach(id => { document.getElementById(id).value = ''; });
+        provenance.forEach(id => { document.getElementById(id).value = ''; });
+      }
+      town.value = data.town;
+      matches.replaceChildren(new Option(data.town,data.town_id,true,true));
+      status.textContent = 'Nearby town found and remembered. Check it is correct, then fill weather for the selected date.';
+    });
+  });
   matches.addEventListener('change', () => {
     lookup.disabled = !matches.value || busy;
     if (!matches.value) return;

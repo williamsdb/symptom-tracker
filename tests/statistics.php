@@ -32,4 +32,13 @@ $data=['daily'=>['time'=>['2026-10-10'],'weather_code'=>[63]],'hourly'=>['temper
 $weather=weatherSummary($data,'2026-10-10');check($weather['weather']==='Rain' && $weather['temperature_c']===12.5 && $weather['pressure_hpa']===1013.2,'Weather summary and units');
 $data['hourly']['pressure_msl']=array_fill(0,24,null);
 try { weatherSummary($data,'2026-10-10'); check(false,'Missing weather must fail'); } catch(RuntimeException $ex){check(true,'Missing weather not treated as zero');}
+$rounded=locationCoordinates(['latitude'=>51.454123,'longitude'=>-0.971239]);
+check($rounded===['latitude'=>51.45,'longitude'=>-0.97],'Location precision reduced');
+foreach ([['latitude'=>91,'longitude'=>0],['latitude'=>0,'longitude'=>181],['latitude'=>'51.45','longitude'=>0],['longitude'=>0],['latitude'=>INF,'longitude'=>0]] as $invalid) {
+    try {locationCoordinates($invalid);check(false,'Invalid coordinates must fail');} catch(RuntimeException $ex){check(true,'Invalid coordinates rejected');}
+}
+$nearby=locationTown(['osm_id'=>123,'osm_type'=>'relation','lat'=>'51.45','lon'=>'-0.97','address'=>['town'=>'Reading','state'=>'England','country'=>'United Kingdom']]);
+check($nearby['label']==='Reading, England, United Kingdom' && $nearby['town_id']==='osm:relation:123','Town normalized from reverse lookup');
+check($nearby['latitude']===51.45 && $nearby['longitude']===-0.97,'Town coordinates used for weather');
+try {locationTown(['address'=>['road'=>'High Street']]);check(false,'No town must fail');} catch(RuntimeException $ex){check(true,'Missing town falls back to manual search');}
 echo "Passed $checks statistics/weather checks.\n";

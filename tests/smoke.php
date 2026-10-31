@@ -103,6 +103,19 @@ try {
     $stmt->execute([$symptomId,date('Y-m-d'),5,'Oxford']); $editId=$db->lastInsertId();
     [$code,$html] = request('?page=log&edit='.$editId);
     check($code===200 && str_contains($html,'name="town" maxlength="100" placeholder="e.g. Reading" value="Oxford"') && !str_contains($html,'value="2639577" selected'),'Editing preserves original town');
+    foreach ([['latitude'=>91,'longitude'=>0],['latitude'=>0,'longitude'=>'bad']] as $invalid) {
+        [$code] = pushRequest(array_merge(['action'=>'locate'],$invalid),$csrf,'weather-api.php');
+        check($code===400,'Location API rejects invalid coordinates');
+    }
+    $nearby=['town_id'=>'osm:relation:123','label'=>'Sample town, England, United Kingdom','latitude'=>51.46,'longitude'=>-0.98];
+    $cacheKey=hash('sha256',json_encode(['latitude'=>51.45,'longitude'=>-0.97]));
+    $stmt=$db->prepare('INSERT INTO location_lookup(id,cache_key,town_json,cached_at) VALUES (1,?,?,?)');
+    $stmt->execute([$cacheKey,json_encode($nearby),time()]);
+    [$code,$data] = pushRequest(['action'=>'locate','latitude'=>51.454123,'longitude'=>-0.971239],$csrf,'weather-api.php');
+    check($code===200 && $data['town_id']==='osm:relation:123','Location uses rounded cached lookup');
+    $remembered=$db->query('SELECT * FROM weather_preferences')->fetch(PDO::FETCH_ASSOC);
+    check($remembered['label']===$nearby['label'] && (float)$remembered['latitude']===51.46,'Nearby town remembered with town centroid');
+    [$code,$html]=request('?page=log');check(str_contains($html,'value="osm:relation:123" selected'),'Browser-derived town preselected next time');
     $configPath = $tmp . '/push-config.php';
     $savedConfig = file_get_contents($configPath);
     chmod($configPath, 0000);

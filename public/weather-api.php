@@ -17,10 +17,29 @@ try {
     if (!$town && $savedTown && $savedTown['town_id'] === $townId) $town = $savedTown;
     if (($input['action'] ?? '') === 'choose') {
         if (!$town) throw new RuntimeException('Search for and select a town again.');
-        query('INSERT INTO weather_preferences (id, town_id, label, latitude, longitude) VALUES (1, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET town_id=excluded.town_id, label=excluded.label, latitude=excluded.latitude, longitude=excluded.longitude',
-            [$townId, $town['label'], $town['latitude'], $town['longitude']]);
+        rememberWeatherTown($townId, $town);
         weatherRespond(['town'=>$town['label']]);
+    }
+    if (($input['action'] ?? '') === 'locate') {
+        $coordinates = locationCoordinates($input);
+        $cacheKey = hash('sha256', json_encode($coordinates,JSON_THROW_ON_ERROR));
+        query('INSERT OR IGNORE INTO location_lookup (id) VALUES (1)');
+        $cache = one('SELECT * FROM location_lookup WHERE id = 1');
+        if ($cache['cache_key'] === $cacheKey && $cache['cached_at'] > time()-2592000) {
+            $nearby = json_decode($cache['town_json'],true,8,JSON_THROW_ON_ERROR);
+        } else {
+            // A single shared limit across sessions/devices respects Nominatim's public service.
+            $claim = query('UPDATE location_lookup SET requested_at = ? WHERE id = 1 AND requested_at <= ?', [time(),time()-2]);
+            if (!$claim->rowCount()) weatherRespond(['error'=>'Please wait a moment before another location lookup.'],429);
+            $data = weatherRequest('https://nominatim.openstreetmap.org/reverse?' . http_build_query([
+                'lat'=>$coordinates['latitude'],'lon'=>$coordinates['longitude'], 'format'=>'jsonv2',
+                'zoom'=>12,'addressdetails'=>1,'accept-language'=>'en',
+            ]));
+            $nearby = locationTown($data);
+            query('UPDATE location_lookup SET cache_key = ?, town_json = ?, cached_at = ? WHERE id = 1',[$cacheKey,json_encode($nearby,JSON_THROW_ON_ERROR),time()]);
+        }
+        rememberWeatherTown($nearby['town_id'], $nearby);
+        weatherRespond(['town'=>$nearby['label'], 'town_id'=>$nearby['town_id']]);
     }
     if (time() - ($_SESSION['weather_request_at'] ?? 0) < 2) weatherRespond(['error'=>'Please wait a moment before another lookup.'],429);
     $_SESSION['weather_request_at'] = time();
