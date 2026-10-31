@@ -90,3 +90,38 @@ The test button contacts the actual push service; a successful response means it
 - Only the generic check-in message is sent. The worker never caches diary pages or API responses. Browser endpoints and keys remain in SQLite on your server.
 
 Developer reference: [PHP Web Push library](https://github.com/web-push-libs/web-push-php/tree/v10.1.0), [Apple Web Push guidance](https://webkit.org/blog/13878/).
+
+### Reminder page shows the sidebar but no content
+
+A likely cause after running setup over SSH is that `data/push-config.php` belongs to your SSH user with mode `600`, while web PHP runs as another user. The reminder page now reports unreadable or malformed configuration instead of stopping rendering. Deploy the updated `src/push.php` and `src/reminders-view.php` to see the diagnostic.
+
+Give the actual PHP service account read access using your host's group or ACL setup. For example, **only if your PHP service group is `www-data`**, run from the project directory:
+
+```sh
+sudo chgrp www-data data/push-config.php
+chmod 640 data/push-config.php
+```
+
+Keep the owner as the cron/SSH user so both can read it. Parent directories also need traversal permission for the PHP user. Do not make the file world-writable, move it into `public/`, or regenerate existing keys to fix permissions. If the page remains blank, check the web PHP error log for the request; CLI PHP output may differ. Never paste or publish the key file's contents.
+
+## Frequency, patterns and environmental context
+
+The Statistics page now shows distinct symptom days, share of recorded days, same-day pairs, changes between equal windows, and an all-history timeline for each symptom (first/last recorded, time since last, longest consecutive recorded streak and recent streak).
+
+- Repeated entries for the same symptom/date count once for frequency and pairs. Per-symptom strength comparisons average entries within each day first.
+- Missing diary days are unknown, not symptom-free. Frequency uses dates with any entry as its denominator, so changes in logging habits can change these figures.
+- Frequency comparison needs two windows of at least 7 calendar days, each with at least 3 recorded days. Strength additionally needs 3 days with that symptom in each window. For an odd-length range the middle day is omitted. The UI shows insufficient-data messages until these rules are met; these rules do not establish statistical significance.
+- A pair percentage appears after at least 3 shared days and 5 days with either symptom. It is shared days divided by days with either symptom, not evidence of causation or simultaneous onset.
+- Streaks count consecutive calendar dates with entries. First-to-last span describes recording history, not continuous illness. History and time-since-last use all saved entries through today, independent of the date filter.
+
+In the diary, expand **Location & environment**, enter a town, choose **Find town**, select the correct match, then **Fill weather for this date**. This retrieves a daily weather description, mean temperature (°C), and mean sea-level pressure (hPa). Save the entry to retain them. The town label, weather source/date/timezone and values are stored in SQLite; no precise device coordinates or GPS permission are used.
+
+Lookup sends the searched town to Open-Meteo's geocoding service, then the selected town's coordinates and diary date to its weather service. Symptoms and notes are never sent. Town-local daily summaries are used; today's values include forecast hours, and older dates use historical model data. They describe the area, not a personal weather sensor. Attribution is shown in the form. See [geocoding](https://open-meteo.com/en/docs/geocoding-api), [weather](https://open-meteo.com/en/docs), and [historical weather](https://open-meteo.com/en/docs/historical-weather-api) documentation. The public service is intended for non-commercial use; check the provider's terms before commercial deployment.
+
+No API key or Composer update is needed. The server needs outbound HTTPS access to `geocoding-api.open-meteo.com`, `api.open-meteo.com`, and `archive-api.open-meteo.com`. If lookup fails, the entry can still be saved with manual or no context. Changing an automatically populated date clears its weather; editing weather manually removes automatic provenance. Existing entries are not automatically backfilled. The SQLite columns are added automatically on first use; back up your database before deploying as usual.
+
+Additional calculation tests:
+
+```sh
+php tests/statistics.php
+```

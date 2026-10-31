@@ -1,11 +1,17 @@
 <?php
 require_once __DIR__ . '/push.php';
-$config = pushConfig();
+$config = null;
+$configError = '';
+try {
+    $config = pushConfig();
+} catch (RuntimeException $ex) {
+    $configError = $ex->getMessage();
+}
 $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
 ?>
 <section class="page-heading"><div><p class="eyebrow">A LITTLE NUDGE EACH DAY</p><h1>Daily reminders</h1><p>Make a moment for your daily check-in.</p></div></section>
 <div class="two-column"><section class="card form-card"><h2>Reminders on this device</h2><p>Each phone or browser has its own reminder settings.</p>
-<?php if (!$config): ?><div class="notice error" role="status">Reminders need server setup first. Install the Composer dependencies, generate reminder keys, then set up cron using the README.</div><?php endif ?>
+<?php if (!$config): ?><div class="notice error" role="alert"><?= $configError !== '' ? e($configError) : 'Reminders need server setup first. Install the Composer dependencies, generate reminder keys, then set up cron using the README.' ?></div><?php endif ?>
 <div id="reminder-status" class="notice" role="status" aria-live="polite">Checking notification support…</div>
 <form id="reminder-form" data-public-key="<?= e($config['publicKey'] ?? '') ?>" data-csrf="<?= e($_SESSION['csrf']) ?>">
 <label for="reminder-time">Daily reminder time</label><input type="time" id="reminder-time" value="20:00" required>

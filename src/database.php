@@ -26,6 +26,11 @@ function db(): PDO {
         last_test_at INTEGER NOT NULL DEFAULT 0, last_error TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )");
+    // Add optional context to existing databases without replacing diary records.
+    $columns = array_column($db->query('PRAGMA table_info(entries)')->fetchAll(), 'name');
+    foreach (['town' => 'TEXT', 'weather' => 'TEXT', 'temperature_c' => 'REAL', 'pressure_hpa' => 'REAL', 'weather_source' => 'TEXT', 'weather_date' => 'TEXT', 'weather_timezone' => 'TEXT'] as $column => $type) {
+        if (!in_array($column, $columns, true)) $db->exec("ALTER TABLE entries ADD COLUMN $column $type");
+    }
     return $db;
 }
 function query(string $sql, array $params = []): PDOStatement { $stmt = db()->prepare($sql); $stmt->execute($params); return $stmt; }

@@ -113,3 +113,61 @@ if (reminderForm) {
   });
   initialise();
 }
+
+const townSearch = document.getElementById('search-town');
+if (townSearch) {
+  const town = document.getElementById('town');
+  const matches = document.getElementById('weather-town');
+  const lookup = document.getElementById('lookup-weather');
+  const status = document.getElementById('weather-status');
+  const date = document.getElementById('experienced_on');
+  const fields = ['weather', 'temperature_c', 'pressure_hpa'];
+  const provenance = ['weather_source','weather_date','weather_timezone'];
+  let busy = false;
+  const manual = () => { provenance.forEach(id => { document.getElementById(id).value = ''; }); status.textContent = 'Manual context. Values are saved as entered.'; };
+  document.getElementById('manual-weather').addEventListener('click', manual);
+  fields.forEach(id => document.getElementById(id).addEventListener('input', manual));
+  town.addEventListener('input', () => { matches.replaceChildren(new Option('Search for this town', '')); lookup.disabled = true; manual(); });
+  date.addEventListener('change', () => {
+    if (document.getElementById('weather_source').value) {
+      fields.forEach(id => { document.getElementById(id).value = ''; });
+      provenance.forEach(id => { document.getElementById(id).value = ''; });
+      status.textContent = 'Date changed. Look up weather again for the new date.';
+    }
+  });
+  matches.addEventListener('change', () => { lookup.disabled = !matches.value || busy; });
+  const requestWeather = async data => {
+    const response = await fetch('weather-api.php', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRF-Token':town.form.querySelector('[name="csrf"]').value}, body:JSON.stringify(data) });
+    let body;
+    try { body = await response.json(); } catch (_) {
+      throw new Error(response.status >= 500
+        ? `The local/server PHP process failed (HTTP ${response.status}). Check the Apache/PHP error log. On MAMP, restart the servers after updating Daywell.`
+        : `Weather endpoint returned an unexpected response (HTTP ${response.status}). Check that weather-api.php is installed at this app’s URL, then reload.`);
+    }
+    if (!response.ok) throw new Error(body.error || 'Weather lookup failed.');
+    return body;
+  };
+  const run = async callback => {
+    if (busy) return;
+    busy = true; townSearch.disabled = lookup.disabled = true;
+    try { await callback(); } catch (error) { status.textContent = error.message; }
+    finally { busy = false; townSearch.disabled = false; lookup.disabled = !matches.value; }
+  };
+  townSearch.addEventListener('click', () => run(async () => {
+    status.textContent = 'Finding matching towns…';
+    const data = await requestWeather({action:'search',town:town.value});
+    matches.replaceChildren(new Option('Choose your town',''));
+    data.towns.forEach(item => matches.add(new Option(item.label,item.id)));
+    status.textContent = data.towns.length ? 'Choose the correct town, then fill weather.' : 'No matching towns found. Try another spelling.';
+  }));
+  lookup.addEventListener('click', () => run(async () => {
+    const selectedDate = date.value;
+    const selectedTown = town.value;
+    status.textContent = 'Looking up weather for ' + selectedDate + '…';
+    const data = await requestWeather({action:'weather',town_id:matches.value,date:selectedDate});
+    if (date.value !== selectedDate || town.value !== selectedTown) throw new Error('Date or town changed during lookup. Please try again.');
+    town.value = data.town;
+    [...fields,...provenance].forEach(id => { document.getElementById(id).value = data[id]; });
+    status.textContent = `${data.weather_source} · daily summary for ${data.weather_date} (${data.weather_timezone}). Ready to save.`;
+  }));
+}

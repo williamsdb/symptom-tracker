@@ -6,8 +6,24 @@ function pushConfigPath(): string { return getenv('DAYWELL_PUSH_CONFIG') ?: dirn
 function pushConfig(): ?array {
     $path = pushConfigPath();
     if (!is_file($path) || !is_file(dirname(__DIR__) . '/vendor/autoload.php')) return null;
-    $config = require $path;
-    if (!is_array($config) || empty($config['publicKey']) || empty($config['privateKey']) || empty($config['subject'])) return null;
+    if (!is_readable($path)) {
+        throw new RuntimeException('PHP cannot read the reminder key file. Give the web-server PHP user read access to data/push-config.php (or your DAYWELL_PUSH_CONFIG file), keeping it outside public/. The setup command creates this file with owner-only permissions.');
+    }
+    $bufferLevel = ob_get_level();
+    ob_start();
+    try {
+        $config = @require $path;
+    } catch (Throwable $ex) {
+        // Do not expose parser errors or file contents: this file contains private keys.
+        throw new RuntimeException('The reminder key file could not be loaded. Check its PHP syntax and that the web-server PHP user has read access. Keep the existing keys; do not regenerate them.');
+    } finally {
+        while (ob_get_level() > $bufferLevel) ob_end_clean();
+    }
+    foreach (['publicKey', 'privateKey', 'subject'] as $key) {
+        if (!is_array($config) || !isset($config[$key]) || !is_string($config[$key]) || $config[$key] === '') {
+            throw new RuntimeException('The reminder key file must return an array containing publicKey, privateKey, and subject. Restore the existing configuration from backup; do not share its contents or regenerate working keys.');
+        }
+    }
     return $config;
 }
 function pushClient(): \Minishlink\WebPush\WebPush {

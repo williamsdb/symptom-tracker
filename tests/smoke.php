@@ -41,12 +41,15 @@ try {
     [$code,$html] = $post(['action'=>'save_symptom','name'=>'headache'], 'symptoms'); check(str_contains($html,'already exists'),'Duplicate symptom');
     $db = new PDO('sqlite:'.$tmp.'/test.sqlite');
     $id = $db->query('SELECT id FROM symptoms')->fetchColumn();
-    $entry = ['action'=>'save_entry','symptom_id'=>$id,'experienced_on'=>date('Y-m-d'),'strength'=>4,'notes'=>'Morning'];
+    $entry = ['action'=>'save_entry','symptom_id'=>$id,'experienced_on'=>date('Y-m-d'),'strength'=>4,'notes'=>'Morning','town'=>'Reading','weather'=>'Rain','temperature_c'=>'12.5','pressure_hpa'=>'1008.2'];
     [$code] = $post($entry); check($code===303,'Save entry');
     [$code] = $post(array_merge($entry,['strength'=>8,'notes'=>'Evening'])); check($code===303,'Multiple entries per date');
     check((int)$db->query('SELECT COUNT(*) FROM entries')->fetchColumn()===2,'Entries persisted');
+    $context = $db->query('SELECT town,temperature_c,pressure_hpa FROM entries LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    check($context['town']==='Reading' && (float)$context['temperature_c']===12.5 && (float)$context['pressure_hpa']===1008.2,'Environmental context persisted');
+    [$code,$html] = request('?page=log'); check(str_contains($html,'1008.2 hPa') && str_contains($html,'Reading'),'Context visible in diary');
     [$code,$html] = request('?page=stats'); check(str_contains($html,'6.0') || str_contains($html,'>6<'),'Correct mean'); check(str_contains($html,'Headache'),'Statistics breakdown');
-    foreach ([['strength'=>11],['strength'=>0],['strength'=>'2.5'],['symptom_id'=>9999],['experienced_on'=>'2026-02-30'],['experienced_on'=>'2999-01-01']] as $invalid) {
+    foreach ([['pressure_hpa'=>'100'],['temperature_c'=>'not-a-number'],['weather_source'=>'Open-Meteo forecast','weather_date'=>'2000-01-01','weather_timezone'=>'Europe/London'],['strength'=>11],['strength'=>0],['strength'=>'2.5'],['symptom_id'=>9999],['experienced_on'=>'2026-02-30'],['experienced_on'=>'2999-01-01']] as $invalid) {
         [$code,$html] = $post(array_merge($entry,$invalid)); check($code===200 && str_contains($html,'role="alert"'),'Reject invalid input');
     }
     check((int)$db->query('SELECT COUNT(*) FROM entries')->fetchColumn()===2,'Invalid entries not saved');
@@ -83,6 +86,28 @@ try {
     check(proc_close($job)===0 && str_contains($jobOutput,'accepted: 0'),'Cron executes with disabled subscription without sending');
     [$code,$manifest] = request('manifest.webmanifest'); check($code===200 && json_decode($manifest,true)['display']==='standalone','Install manifest');
     [$code,$worker] = request('sw.js'); check($code===200 && str_contains($worker,"addEventListener('push'"),'Worker available');
+    [$code] = request('weather-api.php'); check($code===405,'Weather endpoint requires POST');
+    $ch = curl_init($base . 'weather-api.php');
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>'{}']);
+    curl_exec($ch); check(curl_getinfo($ch,CURLINFO_HTTP_CODE)===403,'Weather endpoint requires CSRF'); unset($ch);
+    $configPath = $tmp . '/push-config.php';
+    $savedConfig = file_get_contents($configPath);
+    chmod($configPath, 0000);
+    clearstatcache(true, $configPath);
+    if (!is_readable($configPath)) {
+        [$code,$html] = request('?page=reminders');
+        check($code===200 && str_contains($html,'PHP cannot read the reminder key file.') && str_contains($html,'Set up your iPhone'),'Unreadable configuration keeps reminders page visible');
+    }
+    chmod($configPath, 0600);
+    file_put_contents($configPath, '<?php return [ broken syntax private-key-marker');
+    [$code,$html] = request('?page=reminders');
+    check($code===200 && str_contains($html,'The reminder key file could not be loaded.') && !str_contains($html,'private-key-marker'),'Invalid config produces safe visible error');
+    file_put_contents($configPath, 'private-key-marker without PHP opening tag');
+    [$code,$html] = request('?page=reminders');
+    check($code===200 && str_contains($html,'must return an array') && !str_contains($html,'private-key-marker'),'Configuration contents cannot leak into page');
+    file_put_contents($configPath, $savedConfig);
+    [$code,$html] = request('?page=reminders');
+    check($code===200 && str_contains($html,'data-public-key="'.$keys['publicKey'].'"'),'Restoring configuration restores settings');
     echo "Passed $checks checks.\n";
 } finally {
     proc_terminate($process); proc_close($process);
